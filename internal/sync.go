@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"regexp"
 
 	"github.com/awslabs/ssosync/internal/aws"
 	"github.com/awslabs/ssosync/internal/config"
@@ -38,7 +39,7 @@ import (
 type SyncGSuite interface {
 	SyncUsers(string) error
 	SyncGroups(string) error
-	SyncGroupsUsers(string) error
+	SyncGroupsUsers(string, string) error
 }
 
 // SyncGSuite is an object type that will synchronize real users and groups
@@ -279,13 +280,13 @@ func (s *syncGSuite) SyncGroups(query string) error {
 //  name:Admin* email:aws-*
 //  email:aws-*
 // process workflow:
-//  1) delete users in aws, these were deleted in google
-//  2) update users in aws, these were updated in google
-//  3) add users in aws, these were added in google
-//  4) add groups in aws and add its members, these were added in google
-//  5) validate equals aws an google groups members
-//  6) delete groups in aws, these were deleted in google
-func (s *syncGSuite) SyncGroupsUsers(query string) error {
+//  1. delete users in aws, these were deleted in google
+//  2. update users in aws, these were updated in google
+//  3. add users in aws, these were added in google
+//  4. add groups in aws and add its members, these were added in google
+//  5. validate equals aws an google groups members
+//  6. delete groups in aws, these were deleted in google
+func (s *syncGSuite) SyncGroupsUsers(query, aws_group_query string) error {
 
 	log.WithField("query", query).Info("get google groups")
 	googleGroups, err := s.google.GetGroups(query)
@@ -309,7 +310,7 @@ func (s *syncGSuite) SyncGroupsUsers(query string) error {
 	}
 
 	log.Info("get existing aws groups")
-	awsGroups, err := s.GetGroups()
+	awsGroups, err := s.GetGroups(aws_group_query)
 	if err != nil {
 		log.Error("error getting aws groups")
 		return err
@@ -755,7 +756,7 @@ func DoSync(ctx context.Context, cfg *config.Config) error {
 
 	log.WithField("sync_method", cfg.SyncMethod).Info("syncing")
 	if cfg.SyncMethod == config.DefaultSyncMethod {
-		err = c.SyncGroupsUsers(cfg.GroupMatch)
+		err = c.SyncGroupsUsers(cfg.GroupMatch, cfg.AwsGroupMatch)
 		if err != nil {
 			return err
 		}
@@ -805,9 +806,12 @@ func (s *syncGSuite) includeGroup(name string) bool {
 }
 
 var awsGroups []*aws.Group
+var awsGroupFilter *regexp.Regexp
 
-func (s *syncGSuite) GetGroups() ([]*aws.Group, error) {
+func (s *syncGSuite) GetGroups(name_regex string) ([]*aws.Group, error) {
 	awsGroups = make([]*aws.Group, 0)
+	log.Infof("Getting AWS groups matching regex %s", name_regex)
+	awsGroupFilter = regexp.MustCompile(name_regex)
 
 	err := s.identityStoreClient.ListGroupsPages(
 		&identitystore.ListGroupsInput{IdentityStoreId: &s.cfg.IdentityStoreID},
@@ -824,6 +828,13 @@ func (s *syncGSuite) GetGroups() ([]*aws.Group, error) {
 func ListGroupsPagesCallbackFn(page *identitystore.ListGroupsOutput, lastPage bool) bool {
 	// Loop through each Group returned
 	for _, group := range page.Groups {
+
+		// Remove any groups that don't match our query name pattern.
+		if awsGroupFilter.FindStringIndex(*group.DisplayName) == nil {
+			log.Infof("Skipped group not matching pattern: %s", *group.DisplayName)
+			continue
+		}
+
 		// Convert to native Group object
 		awsGroups = append(awsGroups, &aws.Group{
 			ID:          *group.GroupId,

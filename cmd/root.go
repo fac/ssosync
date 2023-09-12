@@ -167,6 +167,7 @@ func initConfig() {
 		"include_groups",
 		"user_match",
 		"group_match",
+		"aws_group_match",
 		"sync_method",
 		"region",
 		"identity_store_id",
