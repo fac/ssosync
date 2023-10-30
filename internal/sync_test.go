@@ -58,19 +58,19 @@ func Test_getGroupOperations(t *testing.T) {
 			name: "equal groups google and aws",
 			args: args{
 				awsGroups: []*aws.Group{
-					aws.NewGroup("Group-1"),
-					aws.NewGroup("Group-2"),
+					aws.NewGroup("Group-1@domain.com"),
+					aws.NewGroup("Group-2@domain.com"),
 				},
 				googleGroups: []*admin.Group{
-					{Name: "Group-1"},
-					{Name: "Group-2"},
+					{Email: "Group-1@domain.com"},
+					{Email: "Group-2@domain.com"},
 				},
 			},
 			wantAdd:    nil,
 			wantDelete: nil,
 			wantEquals: []*aws.Group{
-				aws.NewGroup("Group-1"),
-				aws.NewGroup("Group-2"),
+				aws.NewGroup("Group-1@domain.com"),
+				aws.NewGroup("Group-2@domain.com"),
 			},
 		},
 		{
@@ -78,13 +78,13 @@ func Test_getGroupOperations(t *testing.T) {
 			args: args{
 				awsGroups: nil,
 				googleGroups: []*admin.Group{
-					{Name: "Group-1"},
-					{Name: "Group-2"},
+					{Email: "Group-1@domain.com"},
+					{Email: "Group-2@domain.com"},
 				},
 			},
 			wantAdd: []*aws.Group{
-				aws.NewGroup("Group-1"),
-				aws.NewGroup("Group-2"),
+				aws.NewGroup("Group-1@domain.com"),
+				aws.NewGroup("Group-2@domain.com"),
 			},
 			wantDelete: nil,
 			wantEquals: nil,
@@ -93,14 +93,14 @@ func Test_getGroupOperations(t *testing.T) {
 			name: "delete two aws groups",
 			args: args{
 				awsGroups: []*aws.Group{
-					aws.NewGroup("Group-1"),
-					aws.NewGroup("Group-2"),
+					aws.NewGroup("Group-1@domain.com"),
+					aws.NewGroup("Group-2@domain.com"),
 				}, googleGroups: nil,
 			},
 			wantAdd: nil,
 			wantDelete: []*aws.Group{
-				aws.NewGroup("Group-1"),
-				aws.NewGroup("Group-2"),
+				aws.NewGroup("Group-1@domain.com"),
+				aws.NewGroup("Group-2@domain.com"),
 			},
 			wantEquals: nil,
 		},
@@ -108,22 +108,22 @@ func Test_getGroupOperations(t *testing.T) {
 			name: "add one, delete one and one equal",
 			args: args{
 				awsGroups: []*aws.Group{
-					aws.NewGroup("Group-2"),
-					aws.NewGroup("Group-3"),
+					aws.NewGroup("Group-2@domain.com"),
+					aws.NewGroup("Group-3@domain.com"),
 				},
 				googleGroups: []*admin.Group{
-					{Name: "Group-1"},
-					{Name: "Group-2"},
+					{Email: "Group-1@domain.com"},
+					{Email: "Group-2@domain.com"},
 				},
 			},
 			wantAdd: []*aws.Group{
-				aws.NewGroup("Group-1"),
+				aws.NewGroup("Group-1@domain.com"),
 			},
 			wantDelete: []*aws.Group{
-				aws.NewGroup("Group-3"),
+				aws.NewGroup("Group-3@domain.com"),
 			},
 			wantEquals: []*aws.Group{
-				aws.NewGroup("Group-2"),
+				aws.NewGroup("Group-2@domain.com"),
 			},
 		},
 	}
