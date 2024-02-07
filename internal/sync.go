@@ -20,10 +20,10 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"regexp"
 
 	"github.com/awslabs/ssosync/internal/aws"
 	"github.com/awslabs/ssosync/internal/config"
+	"github.com/awslabs/ssosync/internal/fac"
 	"github.com/awslabs/ssosync/internal/google"
 	"github.com/hashicorp/go-retryablehttp"
 
@@ -268,7 +268,8 @@ func (s *syncGSuite) SyncGroups(query string) error {
 }
 
 // SyncGroupsUsers will sync groups and its members from Google -> AWS SSO SCIM
-// allowing filter groups base on google api filter query parameter
+// allowing filtering Google groups based on google api filter query parameter
+// and including only those groups from AWS that match the awsGroupMatch filter
 // References:
 // * https://developers.google.com/admin-sdk/directory/v1/guides/search-groups
 // query possible values:
@@ -286,9 +287,9 @@ func (s *syncGSuite) SyncGroups(query string) error {
 //  4. add groups in aws and add its members, these were added in google
 //  5. validate equals aws an google groups members
 //  6. delete groups in aws, these were deleted in google
-func (s *syncGSuite) SyncGroupsUsers(query, aws_group_query string) error {
-
+func (s *syncGSuite) SyncGroupsUsers(query, awsGroupMatch string) error {
 	log.WithField("query", query).Info("get google groups")
+
 	googleGroups, err := s.google.GetGroups(query)
 	if err != nil {
 		return err
@@ -310,10 +311,18 @@ func (s *syncGSuite) SyncGroupsUsers(query, aws_group_query string) error {
 	}
 
 	log.Info("get existing aws groups")
-	awsGroups, err := s.GetGroups(aws_group_query)
+	awsGroups, err := s.GetGroups()
 	if err != nil {
 		log.Error("error getting aws groups")
 		return err
+	}
+
+	log.Info("prune AWS groups that don't originate from Google")
+	onlyAWSGroupsFromGoogle, matchErr := fac.MatchAWSGroups(awsGroups, awsGroupMatch)
+	if err != nil {
+		log.Errorf("error filtering AWS groups by %s", matchErr)
+	} else {
+		awsGroups = onlyAWSGroupsFromGoogle
 	}
 
 	log.Info("get existing aws users")
@@ -806,12 +815,9 @@ func (s *syncGSuite) includeGroup(name string) bool {
 }
 
 var awsGroups []*aws.Group
-var awsGroupFilter *regexp.Regexp
 
-func (s *syncGSuite) GetGroups(name_regex string) ([]*aws.Group, error) {
+func (s *syncGSuite) GetGroups() ([]*aws.Group, error) {
 	awsGroups = make([]*aws.Group, 0)
-	log.Infof("Getting AWS groups matching regex %s", name_regex)
-	awsGroupFilter = regexp.MustCompile(name_regex)
 
 	err := s.identityStoreClient.ListGroupsPages(
 		&identitystore.ListGroupsInput{IdentityStoreId: &s.cfg.IdentityStoreID},
@@ -828,13 +834,6 @@ func (s *syncGSuite) GetGroups(name_regex string) ([]*aws.Group, error) {
 func ListGroupsPagesCallbackFn(page *identitystore.ListGroupsOutput, lastPage bool) bool {
 	// Loop through each Group returned
 	for _, group := range page.Groups {
-
-		// Remove any groups that don't match our query name pattern.
-		if awsGroupFilter.FindStringIndex(*group.DisplayName) == nil {
-			log.Infof("Skipped group not matching pattern: %s", *group.DisplayName)
-			continue
-		}
-
 		// Convert to native Group object
 		awsGroups = append(awsGroups, &aws.Group{
 			ID:          *group.GroupId,
@@ -878,8 +877,8 @@ func ConvertSdkUserObjToNative(user *identitystore.User) *aws.User {
 
 	for _, email := range user.Emails {
 		if email.Value == nil || email.Type == nil || email.Primary == nil {
-              		// This must be a user created by AWS Control Tower
-                        // Need feature development to make how these users are treated
+			// This must be a user created by AWS Control Tower
+			// Need feature development to make how these users are treated
 			// configurable.
 			continue
 		}
