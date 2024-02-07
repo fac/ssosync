@@ -67,13 +67,14 @@ func New(cfg *config.Config, a aws.Client, g google.Client, ids identitystoreifa
 // References:
 // * https://developers.google.com/admin-sdk/directory/v1/guides/search-users
 // query possible values:
-// '' --> empty or not defined
-//  name:'Jane'
-//  email:admin*
-//  isAdmin=true
-//  manager='janesmith@example.com'
-//  orgName=Engineering orgTitle:Manager
-//  EmploymentData.projects:'GeneGnomes'
+// "" --> empty or not defined
+//
+//	name:'Jane'
+//	email:admin*
+//	isAdmin=true
+//	manager='janesmith@example.com'
+//	orgName=Engineering orgTitle:Manager
+//	EmploymentData.projects:'GeneGnomes'
 func (s *syncGSuite) SyncUsers(query string) error {
 	log.Debug("get deleted users")
 	deletedUsers, err := s.google.GetDeletedUsers()
@@ -166,13 +167,14 @@ func (s *syncGSuite) SyncUsers(query string) error {
 // References:
 // * https://developers.google.com/admin-sdk/directory/v1/guides/search-groups
 // query possible values:
-// '' --> empty or not defined
-//  name='contact'
-//  email:admin*
-//  memberKey=user@company.com
-//  name:contact* email:contact*
-//  name:Admin* email:aws-*
-//  email:aws-*
+// "" --> empty or not defined
+//
+//	name='contact'
+//	email:admin*
+//	memberKey=user@company.com
+//	name:contact* email:contact*
+//	name:Admin* email:aws-*
+//	email:aws-*
 func (s *syncGSuite) SyncGroups(query string) error {
 
 	log.WithField("query", query).Debug("get google groups")
@@ -273,13 +275,15 @@ func (s *syncGSuite) SyncGroups(query string) error {
 // References:
 // * https://developers.google.com/admin-sdk/directory/v1/guides/search-groups
 // query possible values:
-// '' --> empty or not defined
-//  name='contact'
-//  email:admin*
-//  memberKey=user@company.com
-//  name:contact* email:contact*
-//  name:Admin* email:aws-*
-//  email:aws-*
+// "" --> empty or not defined
+//
+//	name='contact'
+//	email:admin*
+//	memberKey=user@company.com
+//	name:contact* email:contact*
+//	name:Admin* email:aws-*
+//	email:aws-*
+//
 // process workflow:
 //  1. delete users in aws, these were deleted in google
 //  2. update users in aws, these were updated in google
@@ -611,15 +615,13 @@ func getGroupOperations(awsGroups []*aws.Group, googleGroups []*admin.Group) (ad
 	}
 
 	for _, gGroup := range googleGroups {
-		googleMap[gGroup.Name] = struct{}{}
-	}
+		googleMap[gGroup.Email] = struct{}{}
 
-	// AWS Groups found and not found in google
-	for _, gGroup := range googleGroups {
-		if _, found := awsMap[gGroup.Name]; found {
-			equals = append(equals, awsMap[gGroup.Name])
+		// AWS Groups found and not found in google
+		if _, found := awsMap[gGroup.Email]; found {
+			equals = append(equals, awsMap[gGroup.Email])
 		} else {
-			add = append(add, aws.NewGroup(gGroup.Name))
+			add = append(add, aws.NewGroup(gGroup.Email))
 		}
 	}
 
