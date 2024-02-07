@@ -7,6 +7,7 @@ import (
 	"regexp"
 
 	"github.com/awslabs/ssosync/internal/aws"
+	log "github.com/sirupsen/logrus"
 )
 
 // ErrNoAWSGroups indicates no AWS groups were received.
@@ -25,7 +26,7 @@ func (e ErrorBadRegex) Error() string {
 // MatchAWSGroups will filter out the AWS groups that don't match the regex.
 // Returns an error on failure, a list of AWS groups that match on success.
 func MatchAWSGroups(awsGroups []*aws.Group, matchRegex string) ([]*aws.Group, error) {
-	if awsGroups == nil || len(awsGroups) == 0 {
+	if len(awsGroups) == 0 {
 		return nil, ErrNoAWSGroups
 	}
 
@@ -36,9 +37,12 @@ func MatchAWSGroups(awsGroups []*aws.Group, matchRegex string) ([]*aws.Group, er
 
 	matchedGroups := make([]*aws.Group, 0)
 	for _, group := range awsGroups {
-		if awsGroupRegex.FindStringIndex(group.DisplayName) != nil {
-			matchedGroups = append(matchedGroups, group)
+		if awsGroupRegex.FindStringIndex(group.DisplayName) == nil {
+			log.Infof("AWS group %s will not be included in sync", group.DisplayName)
+			continue
 		}
+
+		matchedGroups = append(matchedGroups, group)
 	}
 
 	return matchedGroups, nil
