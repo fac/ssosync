@@ -54,19 +54,19 @@ func TestMatchAWSGroups(t *testing.T) {
 			name:          "returns an error when input groups empty",
 			awsGroupMatch: "aws-group-*",
 			inputGroups:   []*aws.Group{},
-			expectedErr:   ErrNoAWSGroups,
+			expectedErr:   NoAWSGroupsErr,
 		},
 		{
 			name:          "returns an error when input groups nil",
 			awsGroupMatch: "aws-group-*",
 			inputGroups:   []*aws.Group{},
-			expectedErr:   ErrNoAWSGroups,
+			expectedErr:   NoAWSGroupsErr,
 		},
 		{
 			name:          "returns an error when regex invalid",
 			awsGroupMatch: "[^0-1",
 			inputGroups:   []*aws.Group{{DisplayName: "aws-group-A"}},
-			expectedErr: ErrorBadRegex{
+			expectedErr: BadRegexError{
 				Message: "can't compile regex [^0-1",
 				Err:     &syntax.Error{Code: syntax.ErrMissingBracket, Expr: "[^0-1"},
 			},

@@ -10,16 +10,16 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// ErrNoAWSGroups indicates no AWS groups were received.
-var ErrNoAWSGroups = errors.New("received no AWS groups")
+// NoAWSGroupsErr indicates no AWS groups were received.
+var NoAWSGroupsErr = errors.New("received no AWS groups")
 
-// ErrorBadRegex represents a regex compilation error.
-type ErrorBadRegex struct {
+// BadRegexError represents a regex compilation error.
+type BadRegexError struct {
 	Message string
 	Err     error
 }
 
-func (e ErrorBadRegex) Error() string {
+func (e BadRegexError) Error() string {
 	return e.Message
 }
 
@@ -27,12 +27,12 @@ func (e ErrorBadRegex) Error() string {
 // Returns an error on failure, a list of AWS groups that match on success.
 func MatchAWSGroups(awsGroups []*aws.Group, matchRegex string) ([]*aws.Group, error) {
 	if len(awsGroups) == 0 {
-		return nil, ErrNoAWSGroups
+		return nil, NoAWSGroupsErr
 	}
 
 	awsGroupRegex, err := regexp.Compile(matchRegex)
 	if err != nil {
-		return nil, ErrorBadRegex{Message: fmt.Sprintf("can't compile regex %s", matchRegex), Err: err}
+		return nil, BadRegexError{Message: fmt.Sprintf("can't compile regex %s", matchRegex), Err: err}
 	}
 
 	matchedGroups := make([]*aws.Group, 0)

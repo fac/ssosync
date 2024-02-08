@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -50,6 +51,16 @@ var rootCmd = &cobra.Command{
 	Long: `A command line tool to enable you to synchronise your Google
 Apps (Google Workspace) users to AWS Single Sign-on (AWS SSO)
 Complete documentation is available at https://github.com/awslabs/ssosync`,
+	PreRun: func(cmd *cobra.Command, args []string) {
+		awsGroupMatch, flagErr := cmd.Flags().GetString("aws-group-match")
+		if flagErr != nil {
+			log.Fatal("flag `aws-group-match` does not exist", flagErr)
+		}
+		_, compileErr := regexp.Compile(awsGroupMatch)
+		if compileErr != nil {
+			log.Fatalf("invalid aws-group-match flag value %s", awsGroupMatch, compileErr)
+		}
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()

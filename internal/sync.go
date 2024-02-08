@@ -325,6 +325,8 @@ func (s *syncGSuite) SyncGroupsUsers(query, awsGroupMatch string) error {
 	onlyAWSGroupsFromGoogle, matchErr := fac.MatchAWSGroups(awsGroups, awsGroupMatch)
 	if err != nil {
 		log.Errorf("error filtering AWS groups by %s", matchErr)
+		// Will continue with the full group which will delete the non Google groups.
+		// This flow is prevented by adding pre-run flag validation.
 	} else {
 		awsGroups = onlyAWSGroupsFromGoogle
 	}
