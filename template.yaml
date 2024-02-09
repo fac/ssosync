@@ -33,6 +33,10 @@ Metadata:
         Parameters:
           - IncludeGroups
       - Label:
+          default: "Configuration options for groups Mode only"
+        Parameters:
+          - AwsGroupMatch
+      - Label:
           default: "Lambda Configuration"
         Parameters:
           - FunctionName
@@ -185,6 +189,12 @@ Parameters:
       [optional] Google Workspace group filter query parameter, example: 'name:Admin* email:aws-*', see: https://developers.google.com/admin-sdk/directory/v1/guides/search-groups
     Default: 'name:AWS*'
     AllowedPattern: '(?!.*\s)|(name|Name|NAME)(:([a-zA-Z0-9]{1,64})\*)|(name|Name|NAME)(=([a-zA-Z0-9 ]{1,64}))|(email|Email|EMAIL)(:([a-zA-Z0-9.\-_]{1,64})\*)|(email|Email|EMAIL)(=([a-zA-Z0-9.\-_]{1,64})@([a-zA-Z0-9.\-]{5,260}))'
+
+  AwsGroupMatch:
+    Type: String
+    Description: |
+      [optional] Regex to match AWS groups to be included in sync.
+    Default: '.*'
 
   IgnoreGroups:
     Type: String
@@ -552,6 +562,7 @@ Resources:
           SSOSYNC_IDENTITY_STORE_ID: !If [CreateSecrets, !Ref SecretIdentityStoreID, !Select [5, !Split [',', !Ref CrossStackConfig]]]
           SSOSYNC_USER_MATCH: !If [SetGoogleUserMatch, !Ref GoogleUserMatch, !Ref AWS::NoValue]
           SSOSYNC_GROUP_MATCH: !If [SetGoogleGroupMatch, !Ref GoogleGroupMatch, !Ref AWS::NoValue]
+          SSOSYNC_AWS_GROUP_MATCH: !Ref AWSGroupMatch
           SSOSYNC_SYNC_METHOD: !Ref SyncMethod
           SSOSYNC_IGNORE_GROUPS: !If [SetIgnoreGroups, !Ref IgnoreGroups, !Ref AWS::NoValue]
           SSOSYNC_IGNORE_USERS: !If [SetIgnoreUsers, !Ref IgnoreUsers, !Ref AWS::NoValue]

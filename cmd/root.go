@@ -19,15 +19,16 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
 
+	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/codepipeline"
+	"github.com/aws/aws-sdk-go/service/secretsmanager"
 	"github.com/awslabs/ssosync/internal"
 	"github.com/awslabs/ssosync/internal/config"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-lambda-go/events"
-        "github.com/aws/aws-sdk-go/service/codepipeline"
-	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/secretsmanager"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -50,6 +51,16 @@ var rootCmd = &cobra.Command{
 	Long: `A command line tool to enable you to synchronise your Google
 Apps (Google Workspace) users to AWS Single Sign-on (AWS SSO)
 Complete documentation is available at https://github.com/awslabs/ssosync`,
+	PreRun: func(cmd *cobra.Command, args []string) {
+		awsGroupMatch, flagErr := cmd.Flags().GetString("aws-group-match")
+		if flagErr != nil {
+			log.Fatal("flag `aws-group-match` does not exist", flagErr)
+		}
+		_, compileErr := regexp.Compile(awsGroupMatch)
+		if compileErr != nil {
+			log.Fatalf("invalid aws-group-match flag value %s; %v", awsGroupMatch, compileErr)
+		}
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -66,9 +77,9 @@ Complete documentation is available at https://github.com/awslabs/ssosync`,
 // running inside of AWS Lambda, we use the Lambda
 // execution path.
 func Execute() {
-        if cfg.IsLambda {
-                log.Info("Executing as Lambda")
-        	lambda.Start(Handler) 
+	if cfg.IsLambda {
+		log.Info("Executing as Lambda")
+		lambda.Start(Handler)
 	}
 
 	if err := rootCmd.Execute(); err != nil {
@@ -77,60 +88,60 @@ func Execute() {
 }
 
 func Handler(ctx context.Context, event events.CodePipelineEvent) (string, error) {
-    log.Debug(event)
-    err := rootCmd.Execute()
-    s := session.Must(session.NewSession())
-    cpl := codepipeline.New(s)
+	log.Debug(event)
+	err := rootCmd.Execute()
+	s := session.Must(session.NewSession())
+	cpl := codepipeline.New(s)
 
-    cfg.IsLambdaRunningInCodePipeline = len(event.CodePipelineJob.ID) > 0
+	cfg.IsLambdaRunningInCodePipeline = len(event.CodePipelineJob.ID) > 0
 
-    if cfg.IsLambdaRunningInCodePipeline {
-        log.Info("Lambda has been invoked by CodePipeline")
+	if cfg.IsLambdaRunningInCodePipeline {
+		log.Info("Lambda has been invoked by CodePipeline")
 
-        if err != nil {
-    	    // notify codepipeline and mark its job execution as Failure
-    	    log.Fatalf(errors.Wrap(err, "Notifying CodePipeline and mark its job execution as Failure").Error())
-    	    jobID := event.CodePipelineJob.ID
-    	    if len(jobID) == 0 {
-    		panic("CodePipeline Job ID is not set")
-    	    }  
-    	    // mark the job as Failure.
-    	    cplFailure := &codepipeline.PutJobFailureResultInput{
-    		JobId: aws.String(jobID),
-    		FailureDetails: &codepipeline.FailureDetails{
-    			Message: aws.String(err.Error()),
-    			Type: aws.String("JobFailed"),
-    		},
-    	    }
-    	    _, cplErr := cpl.PutJobFailureResult(cplFailure)
-    	    if cplErr != nil {
-                log.Fatalf(errors.Wrap(err, "Failed to update CodePipeline jobID status").Error())
-    	    }
-    	    return "Failure", err
-        } else {
-            log.Info("Notifying CodePipeline and mark its job execution as Success")
-            jobID := event.CodePipelineJob.ID
-            if len(jobID) == 0 {
-    	       panic("CodePipeline Job ID is not set")
-            }
-            // mark the job as Success.
-            cplSuccess := &codepipeline.PutJobSuccessResultInput{
-    	       JobId: aws.String(jobID),
-            }
-            _, cplErr := cpl.PutJobSuccessResult(cplSuccess)
-            if cplErr != nil {
-                log.Fatalf(errors.Wrap(err, "Failed to update CodePipeline jobID status").Error())
-            }
-            return "Success", nil
-        }
-    } else {
-        if err != nil {
-            log.Fatalf(errors.Wrap(err, "Notifying Lambda and mark this execution as Failure").Error())
-            return "Failure", err
-        } else {
-            return "Success", nil
-        }
-    }
+		if err != nil {
+			// notify codepipeline and mark its job execution as Failure
+			log.Fatalf(errors.Wrap(err, "Notifying CodePipeline and mark its job execution as Failure").Error())
+			jobID := event.CodePipelineJob.ID
+			if len(jobID) == 0 {
+				panic("CodePipeline Job ID is not set")
+			}
+			// mark the job as Failure.
+			cplFailure := &codepipeline.PutJobFailureResultInput{
+				JobId: aws.String(jobID),
+				FailureDetails: &codepipeline.FailureDetails{
+					Message: aws.String(err.Error()),
+					Type:    aws.String("JobFailed"),
+				},
+			}
+			_, cplErr := cpl.PutJobFailureResult(cplFailure)
+			if cplErr != nil {
+				log.Fatalf(errors.Wrap(err, "Failed to update CodePipeline jobID status").Error())
+			}
+			return "Failure", err
+		} else {
+			log.Info("Notifying CodePipeline and mark its job execution as Success")
+			jobID := event.CodePipelineJob.ID
+			if len(jobID) == 0 {
+				panic("CodePipeline Job ID is not set")
+			}
+			// mark the job as Success.
+			cplSuccess := &codepipeline.PutJobSuccessResultInput{
+				JobId: aws.String(jobID),
+			}
+			_, cplErr := cpl.PutJobSuccessResult(cplSuccess)
+			if cplErr != nil {
+				log.Fatalf(errors.Wrap(err, "Failed to update CodePipeline jobID status").Error())
+			}
+			return "Success", nil
+		}
+	} else {
+		if err != nil {
+			log.Fatalf(errors.Wrap(err, "Notifying Lambda and mark this execution as Failure").Error())
+			return "Failure", err
+		} else {
+			return "Success", nil
+		}
+	}
 }
 
 func init() {
@@ -167,6 +178,7 @@ func initConfig() {
 		"include_groups",
 		"user_match",
 		"group_match",
+		"aws_group_match",
 		"sync_method",
 		"region",
 		"identity_store_id",
@@ -246,6 +258,7 @@ func addFlags(cmd *cobra.Command, cfg *config.Config) {
 	rootCmd.Flags().StringSliceVar(&cfg.IncludeGroups, "include-groups", []string{}, "include only these Google Workspace groups, NOTE: only works when --sync-method 'users_groups'")
 	rootCmd.Flags().StringVarP(&cfg.UserMatch, "user-match", "m", "", "Google Workspace Users filter query parameter, example: 'name:John* email:admin*', see: https://developers.google.com/admin-sdk/directory/v1/guides/search-users")
 	rootCmd.Flags().StringVarP(&cfg.GroupMatch, "group-match", "g", "", "Google Workspace Groups filter query parameter, example: 'name:Admin* email:aws-*', see: https://developers.google.com/admin-sdk/directory/v1/guides/search-groups")
+	rootCmd.Flags().StringVarP(&cfg.AwsGroupMatch, "aws-group-match", "a", config.DefaultAwsGroupMatch, "Filter to select specific AWS groups for syncing with Google Workspace, by default selects all. Works only in `groups` sync mode.")
 	rootCmd.Flags().StringVarP(&cfg.SyncMethod, "sync-method", "s", config.DefaultSyncMethod, "Sync method to use (users_groups|groups)")
 	rootCmd.Flags().StringVarP(&cfg.Region, "region", "r", "", "AWS Region where AWS SSO is enabled")
 	rootCmd.Flags().StringVarP(&cfg.IdentityStoreID, "identity-store-id", "i", "", "Identifier of Identity Store in AWS SSO")

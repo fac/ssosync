@@ -17,13 +17,17 @@ type Config struct {
 	UserMatch string `mapstructure:"user_match"`
 	// GroupFilter ...
 	GroupMatch string `mapstructure:"group_match"`
+	// AwsGroupMatch is a regex to filter which AWS groups are included in sync.
+	// Careful this covers all Google groups filtered by GroupMatch or SSOSync will
+	// persistently try to recreate groups.
+	AwsGroupMatch string `mapstructure:"aws_group_match"`
 	// SCIMEndpoint ....
 	SCIMEndpoint string `mapstructure:"scim_endpoint"`
 	// SCIMAccessToken ...
 	SCIMAccessToken string `mapstructure:"scim_access_token"`
 	// IsLambda ...
 	IsLambda bool
-        // IsLambdaRunningInCodePipeline ...
+	// IsLambdaRunningInCodePipeline ...
 	IsLambdaRunningInCodePipeline bool
 	// Ignore users ...
 	IgnoreUsers []string `mapstructure:"ignore_users"`
@@ -50,6 +54,8 @@ const (
 	DefaultGoogleCredentials = "credentials.json"
 	// DefaultSyncMethod is the default sync method to use.
 	DefaultSyncMethod = "groups"
+	// DefaultAwsGroupMatch is the default regex for AWS group name to be matched.
+	DefaultAwsGroupMatch = ".*"
 )
 
 // New returns a new Config
@@ -59,6 +65,7 @@ func New() *Config {
 		LogLevel:          DefaultLogLevel,
 		LogFormat:         DefaultLogFormat,
 		SyncMethod:        DefaultSyncMethod,
+		AwsGroupMatch:     DefaultAwsGroupMatch,
 		GoogleCredentials: DefaultGoogleCredentials,
 	}
 }

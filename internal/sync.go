@@ -23,6 +23,7 @@ import (
 
 	"github.com/awslabs/ssosync/internal/aws"
 	"github.com/awslabs/ssosync/internal/config"
+	"github.com/awslabs/ssosync/internal/fac"
 	"github.com/awslabs/ssosync/internal/google"
 	"github.com/hashicorp/go-retryablehttp"
 
@@ -38,7 +39,7 @@ import (
 type SyncGSuite interface {
 	SyncUsers(string) error
 	SyncGroups(string) error
-	SyncGroupsUsers(string) error
+	SyncGroupsUsers(string, string) error
 }
 
 // SyncGSuite is an object type that will synchronize real users and groups
@@ -269,7 +270,8 @@ func (s *syncGSuite) SyncGroups(query string) error {
 }
 
 // SyncGroupsUsers will sync groups and its members from Google -> AWS SSO SCIM
-// allowing filter groups base on google api filter query parameter
+// allowing filtering Google groups based on google api filter query parameter
+// and including only those groups from AWS that match the awsGroupMatch filter
 // References:
 // * https://developers.google.com/admin-sdk/directory/v1/guides/search-groups
 // query possible values:
@@ -289,9 +291,9 @@ func (s *syncGSuite) SyncGroups(query string) error {
 //  4. add groups in aws and add its members, these were added in google
 //  5. validate equals aws an google groups members
 //  6. delete groups in aws, these were deleted in google
-func (s *syncGSuite) SyncGroupsUsers(query string) error {
-
+func (s *syncGSuite) SyncGroupsUsers(query, awsGroupMatch string) error {
 	log.WithField("query", query).Info("get google groups")
+
 	googleGroups, err := s.google.GetGroups(query)
 	if err != nil {
 		return err
@@ -317,6 +319,16 @@ func (s *syncGSuite) SyncGroupsUsers(query string) error {
 	if err != nil {
 		log.Error("error getting aws groups")
 		return err
+	}
+
+	log.Info("prune AWS groups that don't originate from Google")
+	onlyAWSGroupsFromGoogle, matchErr := fac.MatchAWSGroups(awsGroups, awsGroupMatch)
+	if err != nil {
+		log.Errorf("error filtering AWS groups by %s; %v", awsGroupMatch, matchErr)
+		// Will continue with the full group which will delete the non Google groups.
+		// This flow is prevented by adding pre-run flag validation.
+	} else {
+		awsGroups = onlyAWSGroupsFromGoogle
 	}
 
 	log.Info("get existing aws users")
@@ -542,7 +554,7 @@ func (s *syncGSuite) getGoogleGroupsAndUsers(googleGroups []*admin.Group) ([]*ad
 
 	for _, g := range googleGroups {
 
-		log := log.WithFields(log.Fields{"group": g.Name})
+		log := log.WithFields(log.Fields{"group": g.Email})
 
 		if s.ignoreGroup(g.Email) {
 			log.Debug("ignoring group")
@@ -584,7 +596,7 @@ func (s *syncGSuite) getGoogleGroupsAndUsers(googleGroups []*admin.Group) ([]*ad
 				gUniqUsers[m.Email] = u[0]
 			}
 		}
-		gGroupsUsers[g.Name] = membersUsers
+		gGroupsUsers[g.Email] = membersUsers
 	}
 
 	for _, user := range gUniqUsers {
@@ -757,7 +769,7 @@ func DoSync(ctx context.Context, cfg *config.Config) error {
 
 	log.WithField("sync_method", cfg.SyncMethod).Info("syncing")
 	if cfg.SyncMethod == config.DefaultSyncMethod {
-		err = c.SyncGroupsUsers(cfg.GroupMatch)
+		err = c.SyncGroupsUsers(cfg.GroupMatch, cfg.AwsGroupMatch)
 		if err != nil {
 			return err
 		}
