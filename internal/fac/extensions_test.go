@@ -36,7 +36,7 @@ func TestMatchAWSGroups(t *testing.T) {
 		},
 		{
 			name:          "correctly matches selected groups",
-			awsGroupMatch: "aws-group-*",
+			awsGroupMatch: "aws-group-.*",
 			inputGroups: []*aws.Group{
 				{DisplayName: "aws-group-A"},
 				{DisplayName: "aws-group-B"},
@@ -52,7 +52,7 @@ func TestMatchAWSGroups(t *testing.T) {
 		},
 		{
 			name:          "returns an error when input groups empty",
-			awsGroupMatch: "aws-group-*",
+			awsGroupMatch: "aws-group-.*",
 			inputGroups:   []*aws.Group{},
 			expectedErr:   NoAWSGroupsErr,
 		},

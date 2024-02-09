@@ -324,7 +324,7 @@ func (s *syncGSuite) SyncGroupsUsers(query, awsGroupMatch string) error {
 	log.Info("prune AWS groups that don't originate from Google")
 	onlyAWSGroupsFromGoogle, matchErr := fac.MatchAWSGroups(awsGroups, awsGroupMatch)
 	if err != nil {
-		log.Errorf("error filtering AWS groups by %s", matchErr)
+		log.Errorf("error filtering AWS groups by %s; %v", awsGroupMatch, matchErr)
 		// Will continue with the full group which will delete the non Google groups.
 		// This flow is prevented by adding pre-run flag validation.
 	} else {
@@ -554,7 +554,7 @@ func (s *syncGSuite) getGoogleGroupsAndUsers(googleGroups []*admin.Group) ([]*ad
 
 	for _, g := range googleGroups {
 
-		log := log.WithFields(log.Fields{"group": g.Name})
+		log := log.WithFields(log.Fields{"group": g.Email})
 
 		if s.ignoreGroup(g.Email) {
 			log.Debug("ignoring group")
@@ -596,7 +596,7 @@ func (s *syncGSuite) getGoogleGroupsAndUsers(googleGroups []*admin.Group) ([]*ad
 				gUniqUsers[m.Email] = u[0]
 			}
 		}
-		gGroupsUsers[g.Name] = membersUsers
+		gGroupsUsers[g.Email] = membersUsers
 	}
 
 	for _, user := range gUniqUsers {

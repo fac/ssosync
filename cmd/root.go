@@ -58,7 +58,7 @@ Complete documentation is available at https://github.com/awslabs/ssosync`,
 		}
 		_, compileErr := regexp.Compile(awsGroupMatch)
 		if compileErr != nil {
-			log.Fatalf("invalid aws-group-match flag value %s", awsGroupMatch, compileErr)
+			log.Fatalf("invalid aws-group-match flag value %s; %v", awsGroupMatch, compileErr)
 		}
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
